@@ -1,0 +1,787 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Daegu Summer Heat</title>
+<style>
+:root {
+  --bg: #0a0d12;
+  --bg2: #141a23;
+  --panel: rgba(14, 18, 25, 0.78);
+  --panel-line: rgba(255, 255, 255, 0.09);
+  --ink: #eef1f5;
+  --ink2: #b4bdc8;
+  --muted: #7d8794;
+  --grid: rgba(255, 255, 255, 0.07);
+  --accent: #ffffff;
+  --nodata: #33383f;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; }
+body {
+  background: radial-gradient(ellipse at 50% 35%, var(--bg2) 0%, var(--bg) 70%);
+  color: var(--ink); font-family: var(--font); font-size: 14px; line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+#gl { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; touch-action: none; cursor: grab; }
+#gl.drawing { cursor: crosshair; }
+#gl:active { cursor: grabbing; }
+
+/* ---------- title ---------- */
+#title { position: fixed; top: 20px; left: 24px; max-width: min(560px, calc(100vw - 440px)); pointer-events: none; }
+#title h1 { margin: 0; font-size: 26px; font-weight: 650; letter-spacing: -0.01em; line-height: 1.15; text-shadow: 0 2px 12px rgba(0,0,0,.6); }
+#title p { margin: 6px 0 0; color: var(--ink2); font-size: 13px; text-shadow: 0 1px 8px rgba(0,0,0,.7); }
+
+/* ---------- swipe divider ---------- */
+#swipe { position: fixed; top: 0; bottom: 0; width: 0; left: 50%; z-index: 5; pointer-events: none; }
+#swipe .line { position: absolute; top: 0; bottom: 0; left: -1px; width: 2px; background: rgba(255,255,255,.85); box-shadow: 0 0 12px rgba(0,0,0,.5); }
+#swipe .hit { position: absolute; top: 0; bottom: 0; left: -14px; width: 28px; pointer-events: auto; cursor: ew-resize; touch-action: none; }
+#swipe .knob {
+  position: absolute; top: 50%; left: -22px; width: 44px; height: 44px; margin-top: -22px; border-radius: 50%;
+  background: rgba(15,19,26,.9); border: 2px solid #fff; display: grid; place-items: center;
+  pointer-events: auto; cursor: ew-resize; touch-action: none; box-shadow: 0 4px 18px rgba(0,0,0,.5);
+  font-size: 18px; color: #fff; user-select: none;
+}
+#swipe .knob:focus-visible { outline: 3px solid #8ab4ff; outline-offset: 2px; }
+#swipe .tag {
+  position: absolute; top: 50%; margin-top: 34px; padding: 3px 8px; border-radius: 6px; white-space: nowrap;
+  background: rgba(15,19,26,.85); font-size: 12px; font-weight: 600; letter-spacing: .04em; color: var(--ink);
+}
+#swipe .tag.l { right: 10px; }
+#swipe .tag.r { left: 10px; }
+
+/* ---------- hover readout + hint + compass ---------- */
+#readout {
+  position: fixed; left: 24px; bottom: 56px; padding: 7px 11px; border-radius: 8px; background: var(--panel);
+  border: 1px solid var(--panel-line); font-size: 13px; color: var(--ink); font-variant-numeric: tabular-nums;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); opacity: 0; transition: opacity .15s; pointer-events: none;
+}
+#readout.on { opacity: 1; }
+#hint { position: fixed; left: 24px; bottom: 22px; color: var(--muted); font-size: 12px; pointer-events: none; }
+#compass {
+  position: fixed; left: 24px; top: 104px; width: 40px; height: 40px; border-radius: 50%;
+  border: 1px solid var(--panel-line); background: var(--panel); display: grid; place-items: center; pointer-events: none;
+}
+#compass svg { width: 28px; height: 28px; }
+#labels { position: fixed; inset: 0; pointer-events: none; }
+#labels span {
+  position: absolute; transform: translate(-50%, -120%); font-size: 12px; font-weight: 600; color: #fff;
+  text-shadow: 0 1px 4px #000, 0 0 2px #000; white-space: nowrap;
+}
+
+/* ---------- panel ---------- */
+#panel {
+  position: fixed; top: 16px; right: 16px; bottom: 16px; width: 380px; z-index: 10;
+  background: var(--panel); border: 1px solid var(--panel-line); border-radius: 14px;
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,.45);
+}
+#sheet-toggle { display: none; }
+#panel-body { overflow-y: auto; padding: 18px 20px 16px; flex: 1; }
+#panel section { margin-bottom: 18px; }
+#panel h2 { margin: 0 0 8px; font-size: 12px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase; color: var(--ink2); }
+.big { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.big .num { font-size: 38px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.big .unit { color: var(--ink2); font-size: 14px; }
+.lede { margin: 6px 0 10px; color: var(--ink); font-size: 13.5px; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; margin: 0; font-size: 13px; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; font-variant-numeric: tabular-nums; }
+.caveat { margin: 8px 0 0; color: var(--muted); font-size: 11.5px; }
+#scatter-wrap { position: relative; }
+#scatter { display: block; width: 100%; height: 250px; touch-action: none; cursor: crosshair; }
+#tip {
+  position: absolute; pointer-events: none; padding: 4px 8px; border-radius: 6px; background: #000c; border: 1px solid var(--panel-line);
+  font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; display: none; transform: translate(-50%, -130%);
+}
+.small { color: var(--muted); font-size: 11.5px; margin: 4px 0 0; }
+#selinfo { min-height: 36px; margin: 6px 0 0; font-size: 12.5px; color: var(--ink); font-variant-numeric: tabular-nums; }
+#selinfo:empty::before { content: "Drag on the chart to brush a range, or circle an area on the terrain."; color: var(--muted); }
+.legend { margin-bottom: 10px; }
+.legend .lab { display: flex; justify-content: space-between; font-size: 12px; color: var(--ink2); margin-bottom: 4px; }
+.legend .bar { height: 10px; border-radius: 3px; }
+.legend .ends { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--muted); margin-top: 3px; font-variant-numeric: tabular-nums; }
+.nodata { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted); }
+.nodata i { width: 14px; height: 10px; border-radius: 2px; background: var(--nodata); display: inline-block; }
+.controls { display: grid; gap: 10px; }
+.row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.row label { color: var(--ink2); min-width: 98px; }
+.row input[type=range] { flex: 1; accent-color: #fff; }
+.row output { min-width: 34px; text-align: right; font-variant-numeric: tabular-nums; }
+.btns { display: flex; gap: 8px; flex-wrap: wrap; }
+button.b {
+  font: inherit; font-size: 12.5px; color: var(--ink); background: rgba(255,255,255,.06); border: 1px solid var(--panel-line);
+  padding: 6px 11px; border-radius: 8px; cursor: pointer;
+}
+button.b:hover { background: rgba(255,255,255,.12); }
+button.b[aria-pressed=true] { background: #fff; color: #0a0d12; border-color: #fff; }
+button.b:focus-visible { outline: 2px solid #8ab4ff; outline-offset: 2px; }
+#foot { border-top: 1px solid var(--panel-line); padding-top: 12px; color: var(--muted); font-size: 11.5px; }
+#foot p { margin: 0 0 4px; }
+#foot .key { color: var(--ink2); }
+
+/* ---------- bottom sheet below 768 px ---------- */
+@media (max-width: 767px) {
+  #title { top: 12px; left: 14px; right: 14px; max-width: none; }
+  #title h1 { font-size: 18px; }
+  #title p { font-size: 11.5px; }
+  #compass { top: auto; bottom: 124px; left: 14px; width: 34px; height: 34px; }
+  #hint { display: none; }
+  #readout { left: 14px; bottom: 84px; font-size: 12px; }
+  #panel {
+    top: auto; left: 0; right: 0; bottom: 0; width: auto; max-height: 76vh; border-radius: 16px 16px 0 0;
+    transform: translateY(calc(100% - 66px)); transition: transform .28s ease;
+  }
+  #panel.open { transform: none; }
+  #sheet-toggle {
+    display: block; width: 100%; padding: 8px 16px 10px; background: none; border: 0; color: var(--ink); font: inherit; text-align: left; cursor: pointer;
+  }
+  #sheet-toggle .handle { width: 40px; height: 4px; border-radius: 2px; background: rgba(255,255,255,.35); margin: 0 auto 8px; }
+  #sheet-toggle .sum { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  #sheet-toggle .sum b { font-size: 20px; font-variant-numeric: tabular-nums; }
+  #sheet-toggle .sum > span { color: var(--ink2); font-size: 12px; }
+  #panel-body { padding-top: 4px; }
+  #swipe .knob { top: 42%; }
+  #swipe .tag { top: 42%; }
+}
+</style>
+</head>
+<body>
+<canvas id="gl" aria-label="3D terrain of the Daegu area coloured by NDVI (left of divider) and land surface temperature (right of divider)"></canvas>
+
+<div id="swipe">
+  <div class="line"></div>
+  <div class="hit"></div>
+  <div class="knob" tabindex="0" role="slider" aria-label="Swipe divider: NDVI on the left, LST on the right" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50">&#8596;</div>
+  <span class="tag l">&#8592; NDVI</span>
+  <span class="tag r">LST &#8594;</span>
+</div>
+
+<header id="title">
+  <h1>@@TITLE@@</h1>
+  <p>@@SUBTITLE@@</p>
+</header>
+
+<div id="compass" title="North"><svg viewBox="-14 -14 28 28"><g id="needle"><path d="M0,-11 L4,1 L-4,1 Z" fill="#ff6b5b"/><path d="M0,11 L4,1 L-4,1 Z" fill="#c9d1db"/></g></svg></div>
+<div id="labels"></div>
+<div id="readout"></div>
+<div id="hint">Drag to orbit · right-drag to pan · scroll to zoom · Shift-drag to circle an area · drag the divider to compare layers</div>
+
+<aside id="panel" aria-label="Relationship, chart and legend">
+  <button id="sheet-toggle" aria-expanded="false" aria-controls="panel-body">
+    <div class="handle"></div>
+    <div class="sum">@@SHEET_SUMMARY@@<span id="sheet-cta">Details &#9650;</span></div>
+  </button>
+  <div id="panel-body">
+    @@RELATIONSHIP@@
+
+    <section>
+      <h2>Each dot is one 150 m cell</h2>
+      <div id="scatter-wrap">
+        <canvas id="scatter" aria-label="Scatter plot of LST against NDVI with fitted line"></canvas>
+        <div id="tip"></div>
+      </div>
+      <p class="small">@@SCATTER_NOTE@@</p>
+      <div id="selinfo" aria-live="polite"></div>
+    </section>
+
+    <section>
+      <h2>Legend</h2>
+      @@LEGENDS@@
+      <div class="nodata"><i></i> No data (water, cloud, or no surface-temperature retrieval)</div>
+    </section>
+
+    <section class="controls">
+      <h2>View</h2>
+      <div class="row">
+        <label for="exag">Vertical exaggeration</label>
+        <input id="exag" type="range" min="1" max="8" step="0.5" value="3">
+        <output id="exag-out" for="exag">3×</output>
+      </div>
+      <div class="btns">
+        <button class="b" id="btn-circle" aria-pressed="false">&#9711; Circle an area</button>
+        <button class="b" id="btn-clear">Clear selection</button>
+        <button class="b" id="btn-reset">Reset view</button>
+      </div>
+    </section>
+
+    <footer id="foot">
+      @@FOOTNOTE@@
+    </footer>
+  </div>
+</aside>
+
+<script>@@THREE_JS@@</script>
+<script>@@ORBIT_JS@@</script>
+<script>
+const DATA = @@DATA_JSON@@;
+const B64 = {
+  lst: "@@LST_PNG@@",
+  ndvi: "@@NDVI_PNG@@",
+  height: "@@HEIGHT_BIN@@",
+  grid: "@@GRID_BIN@@"
+};
+</script>
+<script>
+"use strict";
+(async function main() {
+  // ------------------------------------------------------------------ data
+  function b64Bytes(s) {
+    const bin = atob(s), out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  async function bitmap(s) {
+    const blob = new Blob([b64Bytes(s)], { type: "image/png" });
+    return createImageBitmap(blob, { premultiplyAlpha: "none", colorSpaceConversion: "none" });
+  }
+  const S = DATA.stats;
+  const W = S.grid.cols, H = S.grid.rows, N = W * H;
+  const CELL_KM = S.grid.cell_size_m / 1000;
+  const heightM = new Float32Array(b64Bytes(B64.height).buffer);
+  const gridVals = new Float32Array(b64Bytes(B64.grid).buffer);
+  const gLst = gridVals.subarray(0, N), gNdvi = gridVals.subarray(N, 2 * N);
+  const hMin = S.height.min_m, hMax = S.height.max_m;
+  const cells = DATA.cells;
+  const [lstImg, ndviImg] = await Promise.all([bitmap(B64.lst), bitmap(B64.ndvi)]);
+
+  const fmt = (v, dp) => (v < 0 ? "−" : "") + Math.abs(v).toFixed(dp);
+  const fmtInt = v => v.toLocaleString("en-US");
+
+  // ------------------------------------------------------------------ renderer
+  const canvas = document.getElementById("gl");
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 600);
+  const controls = new THREE.OrbitControls(camera, canvas);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.autoRotate = true;
+  controls.autoRotateSpeed = 0.45;
+  controls.maxPolarAngle = Math.PI * 0.47;
+  controls.minDistance = 6;
+  controls.maxDistance = 160;
+  const HOME = { dir: new THREE.Vector3(0, 30, 50).normalize(), dist: 58, target: new THREE.Vector3(0, 0, 2) };
+  const PANEL_SPACE = 396;          // desktop side panel width + margin (px)
+  function sideOffset() { return window.innerWidth >= 768 ? PANEL_SPACE / 2 : 0; }
+  function resetView() {
+    // Pull back on narrow (portrait) screens so the whole basin stays in view
+    const visibleAspect = (window.innerWidth - 2 * sideOffset()) / window.innerHeight;
+    const f = Math.pow(Math.min(2.8, Math.max(0.9, 1.3 / visibleAspect)), 0.6);
+    camera.position.copy(HOME.dir).multiplyScalar(HOME.dist * f).add(HOME.target);
+    controls.target.copy(HOME.target);
+    controls.update();
+  }
+  const stopAuto = () => { controls.autoRotate = false; };
+  controls.addEventListener("start", stopAuto);
+
+  // ------------------------------------------------------------------ terrain geometry
+  // Vertices sit on grid-cell centres; row 0 is north (far side, -z).
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(N * 3), uv = new Float32Array(N * 2);
+  for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
+    const i = r * W + c;
+    pos[3 * i] = (c - (W - 1) / 2) * CELL_KM;
+    pos[3 * i + 2] = (r - (H - 1) / 2) * CELL_KM;
+    uv[2 * i] = (c + 0.5) / W;
+    uv[2 * i + 1] = (r + 0.5) / H;
+  }
+  const idx = new Uint32Array((W - 1) * (H - 1) * 6);
+  let k = 0;
+  for (let r = 0; r < H - 1; r++) for (let c = 0; c < W - 1; c++) {
+    const a = r * W + c, b = a + 1, d = a + W, e = d + 1;
+    idx[k++] = a; idx[k++] = d; idx[k++] = b;
+    idx[k++] = b; idx[k++] = d; idx[k++] = e;
+  }
+  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+  geo.setIndex(new THREE.BufferAttribute(idx, 1));
+
+  function makeTex(img) {
+    const t = new THREE.Texture(img);
+    t.flipY = false;
+    t.generateMipmaps = true;
+    t.minFilter = THREE.LinearMipmapLinearFilter;
+    t.magFilter = THREE.LinearFilter;
+    t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    t.needsUpdate = true;
+    return t;
+  }
+  const maskData = new Uint8Array(N * 4).fill(255);
+  const maskTex = new THREE.DataTexture(maskData, W, H, THREE.RGBAFormat);
+  maskTex.magFilter = THREE.LinearFilter;
+  maskTex.minFilter = THREE.LinearFilter;
+  maskTex.needsUpdate = true;
+
+  const uniforms = {
+    tNdvi: { value: makeTex(ndviImg) },
+    tLst: { value: makeTex(lstImg) },
+    tMask: { value: maskTex },
+    uSplit: { value: 0 },
+    uSel: { value: 0 },
+    uGrid: { value: new THREE.Vector2(W, H) },
+    uCircle: { value: new THREE.Vector3(0, 0, -1) },
+    uHover: { value: new THREE.Vector3(0, 0, -1) },
+    uLight: { value: new THREE.Vector3(-0.55, 0.75, -0.45).normalize() },
+    uNoData: { value: new THREE.Color(0x33383f) },
+  };
+  const terrainMat = new THREE.ShaderMaterial({
+    uniforms,
+    extensions: { derivatives: true },
+    vertexShader: `
+      varying vec2 vUv; varying vec3 vN;
+      void main() {
+        vUv = uv; vN = normal;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: `
+      uniform sampler2D tNdvi, tLst, tMask;
+      uniform float uSplit, uSel;
+      uniform vec2 uGrid;
+      uniform vec3 uCircle, uHover, uLight, uNoData;
+      varying vec2 vUv; varying vec3 vN;
+      float ring(vec2 cell, vec3 c, float widthPx) {
+        float d = length(cell - c.xy);
+        float w = min(fwidth(d) * widthPx, 3.0);
+        return 1.0 - smoothstep(w * 0.5, w, abs(d - c.z));
+      }
+      void main() {
+        // Swipe: compare this fragment's screen x with the divider position
+        vec4 t = gl_FragCoord.x < uSplit ? texture2D(tNdvi, vUv) : texture2D(tLst, vUv);
+        vec3 col = mix(uNoData, t.rgb, t.a);
+        float diff = max(dot(normalize(vN), uLight), 0.0);
+        col *= 0.40 + 0.70 * diff;
+        if (uSel > 0.5) {
+          float m = texture2D(tMask, vUv).r;
+          vec3 grey = vec3(dot(col, vec3(0.299, 0.587, 0.114))) * 0.30;
+          col = mix(grey, col, m);
+        }
+        vec2 cell = vUv * uGrid - 0.5;
+        if (uCircle.z > 0.0) col = mix(col, vec3(1.0), ring(cell, uCircle, 2.5));
+        if (uHover.z > 0.0) col = mix(col, vec3(1.0), ring(cell, uHover, 2.5));
+        gl_FragColor = vec4(col, 1.0);
+      }`,
+  });
+  const terrain = new THREE.Mesh(geo, terrainMat);
+  scene.add(terrain);
+
+  // Skirt: dark side walls so the terrain reads as a block model
+  const BASE_Y = -0.6;
+  const edge = [];
+  for (let c = 0; c < W; c++) edge.push(c);
+  for (let r = 1; r < H; r++) edge.push(r * W + W - 1);
+  for (let c = W - 2; c >= 0; c--) edge.push((H - 1) * W + c);
+  for (let r = H - 2; r >= 0; r--) edge.push(r * W);
+  const skirtGeo = new THREE.BufferGeometry();
+  const skirtPos = new Float32Array(edge.length * 2 * 3);
+  const skirtCol = new Float32Array(edge.length * 2 * 3);
+  const skirtIdx = [];
+  for (let j = 0; j < edge.length; j++) {
+    skirtCol.set([0.19, 0.21, 0.25], 6 * j);
+    skirtCol.set([0.05, 0.06, 0.08], 6 * j + 3);
+    if (j < edge.length - 1) {
+      const a = 2 * j, b = 2 * j + 1, c = 2 * j + 2, d = 2 * j + 3;
+      skirtIdx.push(a, b, c, c, b, d);
+    }
+  }
+  skirtGeo.setAttribute("position", new THREE.BufferAttribute(skirtPos, 3));
+  skirtGeo.setAttribute("color", new THREE.BufferAttribute(skirtCol, 3));
+  skirtGeo.setIndex(skirtIdx);
+  scene.add(new THREE.Mesh(skirtGeo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })));
+
+  // ------------------------------------------------------------------ vertical exaggeration
+  let exag = 3;
+  function applyExag(e) {
+    exag = e;
+    for (let i = 0; i < N; i++) pos[3 * i + 1] = (heightM[i] - hMin) / 1000 * e;
+    geo.attributes.position.needsUpdate = true;
+    geo.computeVertexNormals();
+    geo.computeBoundingSphere();
+    for (let j = 0; j < edge.length; j++) {
+      const i = edge[j];
+      skirtPos.set([pos[3 * i], pos[3 * i + 1], pos[3 * i + 2]], 6 * j);
+      skirtPos.set([pos[3 * i], BASE_Y, pos[3 * i + 2]], 6 * j + 3);
+    }
+    skirtGeo.attributes.position.needsUpdate = true;
+    skirtGeo.computeBoundingSphere();
+  }
+  applyExag(exag);
+
+  // ------------------------------------------------------------------ picking (ray-march the heightfield)
+  function heightAt(col, row) {
+    const c0 = Math.max(0, Math.min(W - 2, Math.floor(col))), r0 = Math.max(0, Math.min(H - 2, Math.floor(row)));
+    const fc = Math.min(1, Math.max(0, col - c0)), fr = Math.min(1, Math.max(0, row - r0));
+    const y = i => pos[3 * i + 1];
+    const i = r0 * W + c0;
+    return (y(i) * (1 - fc) + y(i + 1) * fc) * (1 - fr) + (y(i + W) * (1 - fc) + y(i + W + 1) * fc) * fr;
+  }
+  const toCol = x => x / CELL_KM + (W - 1) / 2;
+  const toRow = z => z / CELL_KM + (H - 1) / 2;
+  const raycaster = new THREE.Raycaster();
+  function rayFrom(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    const ndc = new THREE.Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+    raycaster.setFromCamera(ndc, camera);
+    return raycaster.ray;
+  }
+  function pick(clientX, clientY) {
+    const ray = rayFrom(clientX, clientY);
+    const o = ray.origin, d = ray.direction;
+    const top = (hMax - hMin) / 1000 * exag + 0.01;
+    let t = 0;
+    if (o.y > top) { if (d.y >= 0) return null; t = (top - o.y) / d.y; }
+    const step = CELL_KM * 0.4;
+    let prevT = t;
+    for (let s = 0; s < 6000; s++, t += step) {
+      const x = o.x + d.x * t, y = o.y + d.y * t, z = o.z + d.z * t;
+      if (y < BASE_Y) return null;
+      const col = toCol(x), row = toRow(z);
+      if (col < 0 || col > W - 1 || row < 0 || row > H - 1) { prevT = t; continue; }
+      if (y <= heightAt(col, row)) {
+        let lo = prevT, hi = t;
+        for (let it = 0; it < 12; it++) {
+          const m = (lo + hi) / 2;
+          const mc = toCol(o.x + d.x * m), mr = toRow(o.z + d.z * m);
+          if (o.y + d.y * m <= heightAt(mc, mr)) hi = m; else lo = m;
+        }
+        return { col: toCol(o.x + d.x * hi), row: toRow(o.z + d.z * hi), y: o.y + d.y * hi };
+      }
+      prevT = t;
+    }
+    return null;
+  }
+  function pickPlane(clientX, clientY, y) {
+    const ray = rayFrom(clientX, clientY);
+    if (Math.abs(ray.direction.y) < 1e-6) return null;
+    const t = (y - ray.origin.y) / ray.direction.y;
+    if (t < 0) return null;
+    return { col: toCol(ray.origin.x + ray.direction.x * t), row: toRow(ray.origin.z + ray.direction.z * t) };
+  }
+  function cellIndex(col, row) {
+    const c = Math.round(col), r = Math.round(row);
+    return (c < 0 || c >= W || r < 0 || r >= H) ? -1 : r * W + c;
+  }
+
+  // ------------------------------------------------------------------ swipe divider
+  const swipe = document.getElementById("swipe");
+  const knob = swipe.querySelector(".knob");
+  let split = 0.5;
+  // The split is a share of the visible map width (left of the side panel on desktop)
+  const mapWidth = () => window.innerWidth - 2 * sideOffset();
+  function setSplit(f) {
+    split = Math.max(0.02, Math.min(0.98, f));
+    const px = split * mapWidth();
+    swipe.style.left = px + "px";
+    uniforms.uSplit.value = px * renderer.getPixelRatio();
+    knob.setAttribute("aria-valuenow", Math.round(split * 100));
+  }
+  function dragSplit(ev) {
+    ev.preventDefault();
+    stopAuto();
+    const target = ev.currentTarget;
+    target.setPointerCapture(ev.pointerId);
+    const move = e => setSplit(e.clientX / mapWidth());
+    const up = () => { target.removeEventListener("pointermove", move); target.removeEventListener("pointerup", up); target.removeEventListener("pointercancel", up); };
+    target.addEventListener("pointermove", move);
+    target.addEventListener("pointerup", up);
+    target.addEventListener("pointercancel", up);
+  }
+  knob.addEventListener("pointerdown", dragSplit);
+  swipe.querySelector(".hit").addEventListener("pointerdown", dragSplit);
+  knob.addEventListener("keydown", e => {
+    if (e.key === "ArrowLeft") setSplit(split - 0.02);
+    if (e.key === "ArrowRight") setSplit(split + 0.02);
+  });
+
+  // ------------------------------------------------------------------ selection state
+  // sel = null | {type:"brush", x0,x1,y0,y1 (NDVI, LST)} | {type:"circle", col,row,rad (cells)}
+  let sel = null;
+  const selinfo = document.getElementById("selinfo");
+  const inCircle = (c, r, s) => (c - s.col) ** 2 + (r - s.row) ** 2 <= s.rad * s.rad;
+  function cellSelected(i, s) {
+    if (s.type === "brush") {
+      const x = gNdvi[i], y = gLst[i];
+      return x >= s.x0 && x <= s.x1 && y >= s.y0 && y <= s.y1;
+    }
+    return inCircle(i % W, Math.floor(i / W), s);
+  }
+  function applySelection(s) {
+    sel = s;
+    let n = 0, sumL = 0, sumN = 0;
+    for (let i = 0; i < N; i++) {
+      const on = s ? cellSelected(i, s) : true;
+      maskData[4 * i] = on ? 255 : 0;
+      if (s && on && Number.isFinite(gLst[i]) && Number.isFinite(gNdvi[i])) { n++; sumL += gLst[i]; sumN += gNdvi[i]; }
+    }
+    maskTex.needsUpdate = true;
+    uniforms.uSel.value = s ? 1 : 0;
+    uniforms.uCircle.value.set(s && s.type === "circle" ? s.col : 0, s && s.type === "circle" ? s.row : 0, s && s.type === "circle" ? s.rad : -1);
+    for (const p of cells) p.sel = s ? (s.type === "brush" ? cellSelected(p.row * W + p.col, s) : inCircle(p.col, p.row, s)) : false;
+    if (!s) selinfo.textContent = "";
+    else if (n === 0) selinfo.textContent = "No valid cells in the selection.";
+    else {
+      const what = s.type === "brush" ? "Brushed range" : "Circled area";
+      selinfo.textContent = `${what}: ${fmtInt(n)} cells (of ${fmtInt(S.grid.valid_cells)}) · mean LST ${fmt(sumL / n, 1)} °C · mean NDVI ${fmt(sumN / n, 2)}`;
+    }
+    drawScatter();
+  }
+
+  // ------------------------------------------------------------------ terrain circle-select + hover readout
+  const readout = document.getElementById("readout");
+  const btnCircle = document.getElementById("btn-circle");
+  let circleMode = false, drawing = null;
+  function setCircleMode(on) {
+    circleMode = on;
+    btnCircle.setAttribute("aria-pressed", on);
+    canvas.classList.toggle("drawing", on);
+  }
+  btnCircle.addEventListener("click", () => setCircleMode(!circleMode));
+  window.addEventListener("pointerdown", ev => {
+    if (ev.target !== canvas || !(circleMode || ev.shiftKey) || ev.button !== 0) return;
+    const hit = pick(ev.clientX, ev.clientY);
+    if (!hit) return;
+    controls.enabled = false;
+    stopAuto();
+    drawing = { col: hit.col, row: hit.row, y: hit.y, rad: 0 };
+    canvas.setPointerCapture(ev.pointerId);
+    uniforms.uCircle.value.set(hit.col, hit.row, 0.01);
+    uniforms.uSel.value = 0;
+  }, true);
+  canvas.addEventListener("pointermove", ev => {
+    if (drawing) {
+      const p = pickPlane(ev.clientX, ev.clientY, drawing.y);
+      if (p) {
+        drawing.rad = Math.hypot(p.col - drawing.col, p.row - drawing.row);
+        uniforms.uCircle.value.z = Math.max(drawing.rad, 0.01);
+      }
+      return;
+    }
+    if (ev.buttons) { readout.classList.remove("on"); uniforms.uHover.value.z = -1; return; }
+    const hit = pick(ev.clientX, ev.clientY);
+    const i = hit ? cellIndex(hit.col, hit.row) : -1;
+    if (i < 0) { readout.classList.remove("on"); uniforms.uHover.value.z = -1; return; }
+    const l = gLst[i], n = gNdvi[i];
+    readout.textContent = `Elevation ${Math.round(heightM[i])} m · ` +
+      (Number.isFinite(l) ? `NDVI ${fmt(n, 2)} · LST ${fmt(l, 1)} °C` : "no data in this cell");
+    readout.classList.add("on");
+    uniforms.uHover.value.set(Math.round(hit.col), Math.round(hit.row), 1.6);
+  });
+  canvas.addEventListener("pointerleave", () => { readout.classList.remove("on"); uniforms.uHover.value.z = -1; });
+  function endDraw() {
+    if (!drawing) return;
+    const d = drawing;
+    drawing = null;
+    controls.enabled = true;
+    if (d.rad < 2) { applySelection(null); return; }
+    applySelection({ type: "circle", col: d.col, row: d.row, rad: d.rad });
+  }
+  canvas.addEventListener("pointerup", endDraw);
+  canvas.addEventListener("pointercancel", endDraw);
+
+  // ------------------------------------------------------------------ scatter
+  const sc = document.getElementById("scatter");
+  const tip = document.getElementById("tip");
+  const ctx = sc.getContext("2d");
+  const M = { l: 40, r: 12, t: 10, b: 34 };
+  const xs = cells.map(p => p.ndvi), ys = cells.map(p => p.lst_c);
+  const X0 = Math.floor(Math.min(...xs) * 10) / 10, X1 = Math.ceil(Math.max(...xs) * 10) / 10;
+  const Y0 = Math.floor(Math.min(...ys) / 5) * 5, Y1 = Math.ceil(Math.max(...ys) / 5) * 5;
+  const ramp = DATA.lstRamp, [cl0, cl1] = S.color_ranges.lst_c;
+  function rampColor(v) {
+    const f = Math.max(0, Math.min(1, (v - cl0) / (cl1 - cl0))) * (ramp.length - 1);
+    const i = Math.min(ramp.length - 2, Math.floor(f)), u = f - i;
+    const a = ramp[i], b = ramp[i + 1];
+    return `rgb(${Math.round(a[0] + (b[0] - a[0]) * u)},${Math.round(a[1] + (b[1] - a[1]) * u)},${Math.round(a[2] + (b[2] - a[2]) * u)})`;
+  }
+  for (const p of cells) { p.color = rampColor(p.lst_c); p.sel = false; }
+  let sw = 0, sh = 0;
+  const sx = v => M.l + (v - X0) / (X1 - X0) * (sw - M.l - M.r);
+  const sy = v => sh - M.b - (v - Y0) / (Y1 - Y0) * (sh - M.t - M.b);
+  const ix = px => X0 + (px - M.l) / (sw - M.l - M.r) * (X1 - X0);
+  const iy = py => Y0 + (sh - M.b - py) / (sh - M.t - M.b) * (Y1 - Y0);
+  let brushPx = null, hoverPt = null;
+  function sizeScatter() {
+    const r = sc.getBoundingClientRect();
+    if (!r.width) return;
+    const dpr = Math.min(window.devicePixelRatio, 2);
+    sw = r.width; sh = r.height;
+    sc.width = Math.round(sw * dpr); sc.height = Math.round(sh * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawScatter();
+  }
+  function drawScatter() {
+    if (!sw) return;
+    ctx.clearRect(0, 0, sw, sh);
+    ctx.font = "11px " + getComputedStyle(document.body).fontFamily;
+    ctx.lineWidth = 1;
+    // grid + ticks
+    ctx.strokeStyle = "rgba(255,255,255,0.07)";
+    ctx.fillStyle = "#7d8794";
+    ctx.textAlign = "center"; ctx.textBaseline = "top";
+    const xStep = (X1 - X0) > 0.8 ? 0.2 : 0.1;
+    for (let v = X0; v <= X1 + 1e-9; v += xStep) {
+      const x = sx(v);
+      ctx.beginPath(); ctx.moveTo(x, M.t); ctx.lineTo(x, sh - M.b); ctx.stroke();
+      ctx.fillText(v.toFixed(1).replace("-", "−"), x, sh - M.b + 5);
+    }
+    ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    for (let v = Y0; v <= Y1; v += 5) {
+      const y = sy(v);
+      ctx.beginPath(); ctx.moveTo(M.l, y); ctx.lineTo(sw - M.r, y); ctx.stroke();
+      ctx.fillText(String(v), M.l - 6, y);
+    }
+    ctx.fillStyle = "#b4bdc8";
+    ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+    ctx.fillText("NDVI", (M.l + sw - M.r) / 2, sh - 1);
+    ctx.save(); ctx.translate(11, (M.t + sh - M.b) / 2); ctx.rotate(-Math.PI / 2);
+    ctx.textBaseline = "middle"; ctx.fillText("LST (°C)", 0, 0); ctx.restore();
+    // points
+    const anySel = !!sel;
+    ctx.globalAlpha = anySel ? 0.12 : 0.75;
+    for (const p of cells) if (!p.sel) { ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(sx(p.ndvi), sy(p.lst_c), 2.2, 0, 7); ctx.fill(); }
+    if (anySel) {
+      ctx.globalAlpha = 1;
+      for (const p of cells) if (p.sel) {
+        ctx.fillStyle = p.color; ctx.strokeStyle = "rgba(10,13,18,0.9)";
+        ctx.beginPath(); ctx.arc(sx(p.ndvi), sy(p.lst_c), 2.8, 0, 7); ctx.fill(); ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
+    // OLS line (fit on all valid cells)
+    const a = S.ols.intercept, b = S.ols.slope_per_ndvi;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(M.l, M.t, sw - M.l - M.r, sh - M.t - M.b); ctx.clip();
+    ctx.strokeStyle = "rgba(10,13,18,0.85)"; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(sx(X0), sy(a + b * X0)); ctx.lineTo(sx(X1), sy(a + b * X1)); ctx.stroke();
+    ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+    const kx = sw - M.r - 8, ky = M.t + 10;
+    ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(kx - 112, ky); ctx.lineTo(kx - 92, ky); ctx.stroke();
+    ctx.fillStyle = "#eef1f5"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    ctx.fillText("OLS fit, all cells", kx - 86, ky);
+    // brush
+    if (brushPx) {
+      const [x0, y0, x1, y1] = brushPx;
+      ctx.fillStyle = "rgba(255,255,255,0.08)"; ctx.strokeStyle = "#fff"; ctx.lineWidth = 1;
+      ctx.fillRect(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0));
+      ctx.strokeRect(Math.min(x0, x1) + .5, Math.min(y0, y1) + .5, Math.abs(x1 - x0), Math.abs(y1 - y0));
+    }
+    if (hoverPt) {
+      ctx.strokeStyle = "#fff"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(sx(hoverPt.ndvi), sy(hoverPt.lst_c), 5, 0, 7); ctx.stroke();
+    }
+  }
+  function localXY(ev) { const r = sc.getBoundingClientRect(); return [ev.clientX - r.left, ev.clientY - r.top]; }
+  const clampX = x => Math.max(M.l, Math.min(sw - M.r, x)), clampY = y => Math.max(M.t, Math.min(sh - M.b, y));
+  let brushing = false;
+  sc.addEventListener("pointerdown", ev => {
+    const [x, y] = localXY(ev);
+    brushing = true; stopAuto();
+    sc.setPointerCapture(ev.pointerId);
+    brushPx = [clampX(x), clampY(y), clampX(x), clampY(y)];
+    hoverPt = null; tip.style.display = "none";
+  });
+  sc.addEventListener("pointermove", ev => {
+    const [x, y] = localXY(ev);
+    if (brushing) {
+      brushPx[2] = clampX(x); brushPx[3] = clampY(y);
+      drawScatter();
+      return;
+    }
+    let best = null, bd = 100;
+    for (const p of cells) {
+      const d = (sx(p.ndvi) - x) ** 2 + (sy(p.lst_c) - y) ** 2;
+      if (d < bd) { bd = d; best = p; }
+    }
+    hoverPt = best;
+    if (best) {
+      tip.style.display = "block";
+      tip.style.left = sx(best.ndvi) + "px"; tip.style.top = sy(best.lst_c) + "px";
+      tip.textContent = `NDVI ${fmt(best.ndvi, 2)} · LST ${fmt(best.lst_c, 1)} °C`;
+      uniforms.uHover.value.set(best.col, best.row, 2.5);
+    } else { tip.style.display = "none"; uniforms.uHover.value.z = -1; }
+    drawScatter();
+  });
+  sc.addEventListener("pointerleave", () => { if (!brushing) { hoverPt = null; tip.style.display = "none"; uniforms.uHover.value.z = -1; drawScatter(); } });
+  function endBrush() {
+    if (!brushing) return;
+    brushing = false;
+    const [x0, y0, x1, y1] = brushPx;
+    if (Math.abs(x1 - x0) < 4 || Math.abs(y1 - y0) < 4) { brushPx = null; applySelection(null); return; }
+    applySelection({ type: "brush", x0: ix(Math.min(x0, x1)), x1: ix(Math.max(x0, x1)), y0: iy(Math.max(y0, y1)), y1: iy(Math.min(y0, y1)) });
+  }
+  sc.addEventListener("pointerup", endBrush);
+  sc.addEventListener("pointercancel", endBrush);
+
+  // ------------------------------------------------------------------ controls
+  const exagIn = document.getElementById("exag"), exagOut = document.getElementById("exag-out");
+  exagIn.addEventListener("input", () => { applyExag(+exagIn.value); exagOut.textContent = exagIn.value + "×"; });
+  function clearAll() { brushPx = null; setCircleMode(false); applySelection(null); }
+  document.getElementById("btn-clear").addEventListener("click", clearAll);
+  document.getElementById("btn-reset").addEventListener("click", () => { stopAuto(); resetView(); });
+  window.addEventListener("keydown", e => { if (e.key === "Escape") clearAll(); });
+  const panel = document.getElementById("panel"), toggle = document.getElementById("sheet-toggle");
+  toggle.addEventListener("click", () => {
+    const open = panel.classList.toggle("open");
+    toggle.setAttribute("aria-expanded", open);
+    document.getElementById("sheet-cta").innerHTML = open ? "Hide &#9660;" : "Details &#9650;";
+    setTimeout(sizeScatter, 300);
+  });
+
+  // ------------------------------------------------------------------ optional place labels
+  const labelEls = (DATA.labels || []).map(l => {
+    const el = document.createElement("span");
+    el.textContent = l.name;
+    document.getElementById("labels").appendChild(el);
+    return { el, col: toCol(l.x_km), row: toRow(l.z_km), x: l.x_km, z: l.z_km };
+  });
+  const tmpV = new THREE.Vector3();
+  function placeLabels() {
+    for (const L of labelEls) {
+      tmpV.set(L.x, heightAt(L.col, L.row) + 0.05, L.z).project(camera);
+      const vis = tmpV.z < 1 && Math.abs(tmpV.x) < 1.05 && Math.abs(tmpV.y) < 1.05;
+      L.el.style.display = vis ? "block" : "none";
+      L.el.style.left = ((tmpV.x + 1) / 2 * window.innerWidth) + "px";
+      L.el.style.top = ((1 - tmpV.y) / 2 * window.innerHeight) + "px";
+    }
+  }
+
+  // ------------------------------------------------------------------ resize + loop
+  const needle = document.getElementById("needle");
+  function resize() {
+    const w = window.innerWidth, h = window.innerHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.setViewOffset(w, h, sideOffset(), 0, w, h);
+    camera.updateProjectionMatrix();
+    setSplit(split);
+    sizeScatter();
+  }
+  window.addEventListener("resize", resize);
+  resize();
+  resetView();
+  function frame() {
+    controls.update();
+    needle.setAttribute("transform", `rotate(${THREE.MathUtils.radToDeg(controls.getAzimuthalAngle())})`);
+    placeLabels();
+    renderer.render(scene, camera);
+    requestAnimationFrame(frame);
+  }
+  frame();
+
+  // Small hooks used by the automated check (viz/verify.py)
+  window.__viz = {
+    ready: true,
+    setSplit, mapWidth, getSplit: () => split, stopAuto, applySelection,
+    scatterPx: (ndvi, lst) => { const r = sc.getBoundingClientRect(); return [r.left + sx(ndvi), r.top + sy(lst)]; },
+    selectionText: () => selinfo.textContent,
+  };
+})().catch(err => { console.error(err); document.body.insertAdjacentHTML("beforeend", `<p style="position:fixed;top:40%;left:0;right:0;text-align:center">Could not start the 3D view: ${err.message}</p>`); });
+</script>
+</body>
+</html>

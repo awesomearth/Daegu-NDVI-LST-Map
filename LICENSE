@@ -1,0 +1,27 @@
+Copyright (c) 2026 Hyojun Kwon. All rights reserved.
+
+No license is granted. The source code, documentation, figures, derived data
+and the generated web page in this repository may not be copied, modified,
+distributed, sublicensed or used, in whole or in part, without the prior
+written permission of the copyright holder.
+
+Making this repository publicly visible does not grant any rights beyond
+those GitHub's Terms of Service give other users (viewing and forking on
+GitHub).
+
+Third-party material
+--------------------
+The following are not covered by the notice above and remain under their own
+terms:
+
+- viz/vendor/three.min.js and viz/vendor/OrbitControls.js
+  Copyright 2010-2022 Three.js Authors, MIT License
+  (https://github.com/mrdoob/three.js/blob/dev/LICENSE). A copy of this
+  library is also embedded in viz/daegu_summer_heat.html.
+
+- Landsat 8/9 Collection 2 Level-2 imagery, courtesy of the U.S. Geological
+  Survey, accessed through Microsoft Planetary Computer.
+
+- Copernicus DEM GLO-30: produced using Copernicus WorldDEM-30
+  (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018,
+  provided under COPERNICUS by the European Union and ESA; all rights reserved.

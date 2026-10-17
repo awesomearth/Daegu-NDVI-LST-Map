@@ -1,0 +1,94 @@
+{
+  "scene_id": "LC08_L2SP_114035_20240612_02_T1",
+  "platform": "landsat-8",
+  "datetime_utc": "2024-06-12T01:58:09.772941+00:00",
+  "date": "2024-06-12",
+  "time_kst": "10:58",
+  "scene_cloud_cover_pct": 14.97,
+  "aoi_coverage": 1.0,
+  "aoi_clear_fraction": 0.9983,
+  "clear_threshold_used": 0.9,
+  "scenes_searched": 54,
+  "scenes_passing": 11,
+  "color_ranges": {
+    "lst_c": [
+      26.85,
+      47.25
+    ],
+    "ndvi": [
+      0.206,
+      0.886
+    ],
+    "percentiles": [
+      2,
+      98
+    ],
+    "lst_cmap": "RdYlBu_r",
+    "ndvi_cmap": "YlGn"
+  },
+  "ols": {
+    "formula": "lst_c ~ ndvi",
+    "intercept": 51.9883,
+    "slope_per_ndvi": -25.5128,
+    "slope_per_0_1_ndvi": -2.5513,
+    "slope_per_0_1_ci95": [
+      -2.5601,
+      -2.5425
+    ],
+    "r2": 0.8321,
+    "n": 65331,
+    "note": "CI assumes independent cells; spatial autocorrelation makes it too narrow."
+  },
+  "grid": {
+    "rows": 260,
+    "cols": 272,
+    "cell_size_m": 150.0,
+    "pixels_per_cell": 5,
+    "min_valid_share": 0.6667,
+    "crs": "EPSG:32652",
+    "bounds_utm": [
+      441195.0,
+      3950715.0,
+      481995.0,
+      3989715.0
+    ],
+    "valid_cells": 65331
+  },
+  "texture": {
+    "rows": 1300,
+    "cols": 1360,
+    "pixel_size_m": 30.0
+  },
+  "height": {
+    "min_m": 9.0,
+    "max_m": 1160.9,
+    "source": "Copernicus DEM GLO-30 (cop-dem-glo-30)"
+  },
+  "bbox_lonlat": [
+    128.35,
+    35.7,
+    128.8,
+    36.05
+  ],
+  "valid_value_ranges": {
+    "lst_c_p1_p99": [
+      26.29,
+      48.68
+    ],
+    "ndvi_min_max": [
+      -0.2708,
+      0.9956
+    ]
+  },
+  "qa_masked_bits": {
+    "fill": 0,
+    "dilated_cloud": 1,
+    "cirrus": 2,
+    "cloud": 3,
+    "cloud_shadow": 4,
+    "water": 7
+  },
+  "sampled_cells": 3000,
+  "sample_seed": 42,
+  "download_mb_upper_bound": 341.3
+}
