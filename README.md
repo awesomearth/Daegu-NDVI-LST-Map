@@ -2,7 +2,7 @@
 
 An interactive 3D map comparing vegetation (NDVI) with land surface temperature
 (LST) across Daegu, South Korea, on a clear summer day. Both layers are draped
-over terrain, and a swipe divider lets you compare them side by side.
+over terrain, and a swipe divider lets you compare them side by side. Built with Claude Code. 
 
 ![Desktop view with the swipe divider at 30 %](viz/screenshots/desktop_swipe30.png)
 
